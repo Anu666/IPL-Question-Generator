@@ -11,7 +11,6 @@ class MCQOption(BaseModel):
 
 class MCQQuestion(BaseModel):
     id: int
-    category: str
     questionText: str
     options: list[MCQOption]
     credits: int

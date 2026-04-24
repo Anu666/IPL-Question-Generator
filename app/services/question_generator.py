@@ -60,7 +60,6 @@ Return ONLY a valid JSON array:
 [
   {{
     "id": 1,
-    "category": "Batting",
     "questionText": "Will Rohit Sharma score 50+ runs today?",
     "options": [
       {{"id": 1, "optionText": "Yes, he will score 50+"}},
@@ -69,9 +68,6 @@ Return ONLY a valid JSON array:
     "credits": 20
   }}
 ]
-
-Categories — spread questions but repeat categories freely if match warrants:
-Toss | Batting | Bowling | Fielding | Powerplay | Death Overs | Sixes & Fours | Match Outcome
 
 Credits (based on likelihood):
   10 = near-certain (who wins toss, does match go full 20 overs)
@@ -121,7 +117,6 @@ def _parse_questions(raw: list) -> list[MCQQuestion]:
                 continue
             questions.append(MCQQuestion(
                 id=item.get("id", idx),
-                category=item.get("category", "General"),
                 questionText=item.get("questionText", item.get("question", "")),
                 options=options,
                 credits=item.get("credits", 10),
