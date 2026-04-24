@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # External API keys
+    CRICAPI_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+
     class Config:
         # Read values from the .env file at project root
         env_file = ".env"

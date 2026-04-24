@@ -4,6 +4,13 @@ pydantic>=2.7.0
 pydantic-settings>=2.2.0
 python-dotenv>=1.0.0
 
-# Testing
+# Data fetching & scraping
 httpx>=0.27.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# AI
+google-genai>=1.0.0
+
+# Testing
 pytest>=8.0.0
