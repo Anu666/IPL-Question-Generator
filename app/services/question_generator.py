@@ -23,21 +23,22 @@ records, recent form, and match statuses to inform your questions.
 {context_json}
 --- END DATA ---
 {direction_block}
-CRITICAL INSTRUCTION: You are an IPL expert. You know the current squads,
-season form, playing conditions, and head-to-head records for {team1}
-and {team2} in IPL 2026. Use that knowledge. The data above may be sparse —
-fill every gap with your own expertise.
+You are an IPL expert. You know the current squads, season form, playing
+conditions, and head-to-head records for {team1} and {team2} in IPL 2026.
+Use that knowledge. The data above may be sparse — fill every gap with your
+own expertise.
 
-Generate 15 to 18 prediction questions fans answer BEFORE the match.
+Generate prediction questions fans answer BEFORE the match.
 These are NOT trivia. No correct answer exists yet — fans predict what
 WILL happen; answers are revealed post-match.
 
-=== QUESTION MIX ===
+=== DEFAULT QUESTION MIX (ignored if ADMIN DIRECTION overrides it) ===
 
 Focus primarily on TEAM and MATCH-LEVEL predictions.
 Limit player-specific questions to a maximum of 4.
+Default count: 15 to 18 questions.
 
-Preferred question types (use for most questions):
+Preferred question types:
   - "Will {team1} score 180+ in their innings?"
   - "Will the match go to a Super Over?"
   - "Which team will take more wickets in the powerplay?"
@@ -139,10 +140,35 @@ def generate_questions(match_context: dict, direction: str | None = None) -> lis
     direction_block = ""
     if direction and direction.strip():
         direction_block = (
-            f"\n=== ADMIN DIRECTION ===\n\n"
-            f"{direction.strip()}\n\n"
-            f"Follow the above direction when selecting question topics and themes.\n"
-            f"=== END DIRECTION ===\n"
+            f"\n"
+            f"╔══════════════════════════════════════════════════════╗\n"
+            f"║              !! MANDATORY ADMIN OVERRIDE !!          ║\n"
+            f"╚══════════════════════════════════════════════════════╝\n"
+            f"\n"
+            f"The following instruction from the admin MUST be followed EXACTLY\n"
+            f"and takes ABSOLUTE PRIORITY over every other instruction in this\n"
+            f"prompt, including the default question count, topic mix, and\n"
+            f"player-question limits.\n"
+            f"\n"
+            f"ADMIN INSTRUCTION:\n"
+            f"  {direction.strip()}\n"
+            f"\n"
+            f"Rules for complying with the admin instruction:\n"
+            f"  - If a SPECIFIC NUMBER of questions is mentioned, generate EXACTLY\n"
+            f"    that number — not one more, not one less.\n"
+            f"  - If a TOPIC or THEME is specified (e.g. 'batting', 'powerplay',\n"
+            f"    'bowling', 'boundaries'), ALL questions must be about that topic.\n"
+            f"    Do not generate questions outside the specified topic.\n"
+            f"  - If a PLAYER is mentioned, generate questions specifically about\n"
+            f"    that player and ignore the usual player-question limit.\n"
+            f"  - If a FORMAT restriction is given (e.g. 'Yes/No only', '4 options'),\n"
+            f"    apply it to every question.\n"
+            f"  - If the instruction contradicts the default question mix below,\n"
+            f"    the admin instruction WINS. Ignore the default mix entirely.\n"
+            f"  - Do NOT add extra questions beyond what is requested, and do NOT\n"
+            f"    silently substitute a different topic just because it seems\n"
+            f"    'more interesting'.\n"
+            f"\n"
         )
 
     prompt = _PROMPT_TEMPLATE.format(
