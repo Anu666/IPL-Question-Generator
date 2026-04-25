@@ -1,12 +1,49 @@
 # Question generator service
 # Sends the match context to Gemini and parses the MCQ response.
-# Uses gemini-1.5-flash for fast, cost-efficient generation.
+# Tries multiple free Gemini models in order; falls back if one is busy.
 
 import json
 import re
 
 from google import genai
 from google.genai import types
+
+# Models tried in order. If a model returns a rate-limit / server-busy
+# error (HTTP 429 or 503) the next model in the list is attempted.
+_CANDIDATE_MODELS = [
+    "gemini-3.1-flash-lite-preview",    # primary
+    "gemini-3-flash-preview",           # first fallback
+    "gemini-2.5-pro",                   # second fallback
+    "gemini-2.5-flash",                 # third fallback
+    "gemini-2.5-flash-lite",            # last resort
+]
+
+# HTTP status codes and exception substrings that indicate the model is
+# temporarily unavailable (rate-limited or overloaded) rather than broken.
+_RETRY_STATUS_CODES = {429, 503}
+_RETRY_KEYWORDS = (
+    "resource_exhausted",
+    "quota",
+    "rate limit",
+    "too many requests",
+    "unavailable",
+    "overloaded",
+    "server error",
+    "service unavailable",
+    "model is overloaded",
+)
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Return True when the exception looks like a transient model-busy error."""
+    msg = str(exc).lower()
+    if any(kw in msg for kw in _RETRY_KEYWORDS):
+        return True
+    # google-genai wraps gRPC / HTTP errors; check for numeric status codes too.
+    for code in _RETRY_STATUS_CODES:
+        if str(code) in msg:
+            return True
+    return False
 
 from app.core.config import settings
 from app.schemas.question import MCQOption, MCQQuestion
@@ -179,16 +216,32 @@ def generate_questions(match_context: dict, direction: str | None = None) -> lis
         direction_block=direction_block,
     )
 
-    response = client.models.generate_content(
-        model="gemini-3.1-flash-lite-preview",
-        contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.7),
+    last_exc: Exception | None = None
+    for model_name in _CANDIDATE_MODELS:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.7),
+            )
+            raw = _extract_json_array(response.text)
+            questions = _parse_questions(raw)
+            if questions:
+                return questions
+            # Model responded but gave no parseable questions — don't retry
+            raise RuntimeError(
+                f"Model '{model_name}' returned no valid questions. "
+                "Check the prompt or try a different direction."
+            )
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            if _is_retryable(exc):
+                last_exc = exc
+                continue  # try the next model
+            raise RuntimeError(f"AI model error ({model_name}): {exc}") from exc
+
+    raise RuntimeError(
+        f"All AI models are currently busy or rate-limited. "
+        f"Please try again in a moment. Last error: {last_exc}"
     )
-
-    raw = _extract_json_array(response.text)
-    questions = _parse_questions(raw)
-
-    if not questions:
-        raise RuntimeError("Gemini returned no valid questions. Check the API key and model availability.")
-
-    return questions
