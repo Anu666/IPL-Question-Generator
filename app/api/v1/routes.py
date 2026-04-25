@@ -39,7 +39,7 @@ async def generate_match_questions(request: QuestionRequest):
     """
     try:
         context = await gather_match_context(request.team1, request.team2, request.date)
-        questions = generate_questions(context)
+        questions = generate_questions(context, direction=request.direction)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception as exc:

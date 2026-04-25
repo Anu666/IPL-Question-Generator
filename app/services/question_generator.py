@@ -22,9 +22,9 @@ records, recent form, and match statuses to inform your questions.
 --- MATCH DATA ---
 {context_json}
 --- END DATA ---
-
+{direction_block}
 CRITICAL INSTRUCTION: You are an IPL expert. You know the current squads,
-key players, batting order, strike bowlers, and season form for {team1}
+season form, playing conditions, and head-to-head records for {team1}
 and {team2} in IPL 2026. Use that knowledge. The data above may be sparse —
 fill every gap with your own expertise.
 
@@ -32,26 +32,27 @@ Generate 15 to 18 prediction questions fans answer BEFORE the match.
 These are NOT trivia. No correct answer exists yet — fans predict what
 WILL happen; answers are revealed post-match.
 
-=== QUALITY BAR ===
+=== QUESTION MIX ===
 
-A mix of question types is fine, but at least 10 of the 15-18 questions MUST
-be specific — naming real players or referencing concrete thresholds.
+Focus primarily on TEAM and MATCH-LEVEL predictions.
+Limit player-specific questions to a maximum of 4.
 
-Generic questions (allowed, max 5):
-  - "Who will win the match?"
-  - "Which team will win the toss?"
-  - "Will there be a super over?"
-
-Specific questions (required — at least 10):
-  - "Will Rohit Sharma hit a six in the powerplay overs?"
-  - "Will Jasprit Bumrah concede fewer than 30 runs in his 4 overs?"
+Preferred question types (use for most questions):
   - "Will {team1} score 180+ in their innings?"
-  - "Who will be {team2}'s highest scorer — [Player A], [Player B], or [Player C]?"
-  - "Will MS Dhoni bat at position 5 or lower?"
+  - "Will the match go to a Super Over?"
+  - "Which team will take more wickets in the powerplay?"
+  - "Will there be 15+ sixes in the match?"
+  - "Will {team2} lose more than 3 wickets in the powerplay?"
+  - "Will the winning team win by more than 20 runs?"
+  - "Who will win the toss — {team1} or {team2}?"
+  - "Will there be a 100+ run partnership in the match?"
+  - "Will {team1} restrict {team2} under 160?"
 
-Every specific question MUST either:
-  a) Name a real player from the {team1} or {team2} IPL 2026 squad, OR
-  b) Reference a concrete, measurable threshold (e.g. 180+, 2+ wickets, 4+ sixes)
+Player-specific questions (maximum 4, only for marquee players):
+  - "Will [Star Batsman] score 50+?"
+  - "Will [Key Bowler] take 2+ wickets?"
+
+Every question must be a concrete, measurable prediction.
 
 === FORMAT ===
 
@@ -60,21 +61,21 @@ Return ONLY a valid JSON array:
 [
   {{
     "id": 1,
-    "questionText": "Will Rohit Sharma score 50+ runs today?",
+    "questionText": "Will {team1} score 180+ in their innings?",
     "options": [
-      {{"id": 1, "optionText": "Yes, he will score 50+"}},
-      {{"id": 2, "optionText": "No, he won't reach 50"}}
+      {{"id": 1, "optionText": "Yes, 180+"}},
+      {{"id": 2, "optionText": "No, under 180"}}
     ],
-    "credits": 20
+    "credits": 15
   }}
 ]
 
-Credits (based on likelihood):
-  10 = near-certain (who wins toss, does match go full 20 overs)
-  15 = common event (team scores 170+, top-order bat scores 30+)
-  20 = moderate (player scores 50+, bowler takes 2 wkts)
-  25 = unlikely (century, 3 wickets in a spell, 8+ sixes by one batter)
-  30 = rare (hat-trick, super over, bowled for golden duck by star batter)
+Credits (based on how unlikely the event is):
+  10 = near-certain (toss winner, does match complete full 20 overs)
+  15 = common (team scores 160+, 8+ sixes in the match)
+  20 = moderate (team scores 185+, 50+ partnership in powerplay)
+  25 = unlikely (team scores 200+, 3 wickets in first 2 overs)
+  30 = rare (super over, hat-trick, last-ball finish)
 
 Rules:
   - 2 to 4 options per question (Yes/No is fine for binary events)
@@ -126,7 +127,7 @@ def _parse_questions(raw: list) -> list[MCQQuestion]:
     return questions
 
 
-def generate_questions(match_context: dict) -> list[MCQQuestion]:
+def generate_questions(match_context: dict, direction: str | None = None) -> list[MCQQuestion]:
     """
     Call Gemini with the match context and return parsed MCQ questions.
     Raises RuntimeError if Gemini fails or returns no usable questions.
@@ -134,11 +135,22 @@ def generate_questions(match_context: dict) -> list[MCQQuestion]:
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     match = match_context.get("match", {})
+
+    direction_block = ""
+    if direction and direction.strip():
+        direction_block = (
+            f"\n=== ADMIN DIRECTION ===\n\n"
+            f"{direction.strip()}\n\n"
+            f"Follow the above direction when selecting question topics and themes.\n"
+            f"=== END DIRECTION ===\n"
+        )
+
     prompt = _PROMPT_TEMPLATE.format(
         team1=match.get("team1", "Team 1"),
         team2=match.get("team2", "Team 2"),
         date=match.get("date", ""),
         context_json=json.dumps(match_context, indent=2),
+        direction_block=direction_block,
     )
 
     response = client.models.generate_content(

@@ -20,6 +20,7 @@ class QuestionRequest(BaseModel):
     team1: str   # e.g. "Mumbai Indians"
     team2: str   # e.g. "Chennai Super Kings"
     date: str    # e.g. "2026-04-28"
+    direction: str | None = None  # Optional admin direction for question focus
 
     @field_validator("date")
     @classmethod
